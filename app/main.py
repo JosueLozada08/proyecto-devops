@@ -9,76 +9,90 @@ from ldclient import LDClient
 from ldclient.config import Config
 
 # ---------------- LaunchDarkly ----------------
-# La SDK key real se inyecta por la variable de entorno LAUNCHDARKLY_SDK_KEY
-# En Kubernetes viene desde el Secret launchdarkly-secret (ver k8s/deployment.yaml)
-LD_SDK_KEY = os.getenv("LAUNCHDARKLY_SDK_KEY", "sdk-xxx-tu-llave-aqui")
+FEATURE_NEW_PRICING = "new-pricing-strategy"  # nombre del feature flag
+
+# Leemos la SDK key desde la variable de entorno
+LD_SDK_KEY = os.getenv("LAUNCHDARKLY_SDK_KEY")
+
+if not LD_SDK_KEY:
+    # Esto no rompe la app, pero avisa en logs
+    print(
+        "[LaunchDarkly] WARNING: LAUNCHDARKLY_SDK_KEY no está definida. "
+        "Los feature flags siempre devolverán el valor por defecto."
+    )
+    # Valor dummy para que el cliente inicialice, pero las evaluaciones usarán el default
+    LD_SDK_KEY = "sdk-00000000-0000-0000-0000-000000000000"
+
 ld_client = LDClient(Config(LD_SDK_KEY))
 
-# Nombre del feature flag configurado en LaunchDarkly
-FEATURE_NEW_PRICING = "new-pricing-strategy"
-
 # ---------------- FastAPI ----------------
-app = FastAPI(title="API DevOps con LaunchDarkly y Argo CD")
+app = FastAPI(
+    title="API DevOps con LaunchDarkly",
+    description=(
+        "API de ejemplo con CRUD en memoria y un endpoint que usa LaunchDarkly "
+        "para habilitar una nueva estrategia de precios."
+    ),
+    version="1.0.0",
+)
 
 
-@app.get("/")
-def read_root():
-    return {"message": "API DevOps funcionando"}
+@app.on_event("shutdown")
+def shutdown_event():
+    """
+    Cierra el cliente de LaunchDarkly cuando se apaga la app.
+    """
+    ld_client.close()
 
 
-# ---------- CRUD de Items (en memoria) ----------
-
+# ---------------- Endpoints CRUD ----------------
 @app.get("/items", response_model=List[Item])
 def listar_items():
-    """Lista todos los items almacenados en memoria."""
+    """
+    Lista todos los ítems en la 'base de datos' en memoria.
+    """
     return list(db.values())
 
 
 @app.post("/items", response_model=Item, status_code=201)
-def crear_item(item_in: ItemBase):
-    """Crea un nuevo item en la 'base de datos' en memoria."""
-    new_id = get_next_id()
-    item = Item(id=new_id, **item_in.dict())
-    db[new_id] = item
-    return item
+def crear_item(item: ItemBase):
+    """
+    Crea un nuevo ítem con ID autogenerado.
+    """
+    item_id = get_next_id()
+    nuevo = Item(id=item_id, **item.dict())
+    db[item_id] = nuevo
+    return nuevo
 
 
 @app.get("/items/{item_id}", response_model=Item)
 def obtener_item(item_id: int):
-    """Obtiene un item por ID."""
+    """
+    Obtiene un ítem por su ID.
+    """
     if item_id not in db:
         raise HTTPException(status_code=404, detail="Item no encontrado")
     return db[item_id]
 
 
-@app.put("/items/{item_id}", response_model=Item)
-def actualizar_item(item_id: int, item_in: ItemBase):
-    """Actualiza completamente un item existente."""
-    if item_id not in db:
-        raise HTTPException(status_code=404, detail="Item no encontrado")
-
-    item = Item(id=item_id, **item_in.dict())
-    db[item_id] = item
-    return item
-
-
 @app.delete("/items/{item_id}", status_code=204)
 def eliminar_item(item_id: int):
-    """Elimina un item por ID."""
+    """
+    Elimina un ítem por su ID.
+    """
     if item_id not in db:
         raise HTTPException(status_code=404, detail="Item no encontrado")
     del db[item_id]
     return
 
 
-# ---------- Endpoint con Feature Flag (LaunchDarkly) ----------
-
+# ---------------- Endpoint con LaunchDarkly ----------------
 @app.get("/items/{item_id}/precio", response_model=float)
 def obtener_precio_item(
     item_id: int,
     x_user_id: Optional[str] = Header(
         default="anonimo",
         alias="X-User-Id",
+        description="Identificador del usuario para evaluar el feature flag",
     ),
 ):
     """
@@ -102,15 +116,15 @@ def obtener_precio_item(
         nuevo_precio_activo = ld_client.bool_variation(
             FEATURE_NEW_PRICING,
             user,
-            False  # fallback si LaunchDarkly no responde
+            False,  # fallback si LaunchDarkly no responde
         )
-    except Exception:
-        # Si algo sale mal con LaunchDarkly, no rompemos la API:
-        # simplemente usamos el precio normal
+    except Exception as e:
+        # No rompemos la API por culpa de LaunchDarkly
+        print(f"[LaunchDarkly] Error evaluando flag: {e}")
         nuevo_precio_activo = False
 
     if nuevo_precio_activo:
-        # Nueva lógica (10% de descuento)
+        # Nueva lógica de precios (10% descuento)
         return round(item.precio * 0.9, 2)
     else:
         # Lógica actual
