@@ -85,24 +85,32 @@ def obtener_precio_item(
     Devuelve el precio del item aplicando o no la nueva estrategia de precios
     según el feature flag 'new-pricing-strategy' en LaunchDarkly.
 
-    - Si el flag está OFF → se devuelve el precio normal.
-    - Si el flag está ON para el usuario → se aplica un 10% de descuento.
+    - Si el flag está OFF o hay cualquier problema con LaunchDarkly → precio normal.
+    - Si el flag está ON para el usuario → aplica 10 % de descuento.
     """
     if item_id not in db:
         raise HTTPException(status_code=404, detail="Item no encontrado")
 
     item = db[item_id]
-
-    # Contexto de usuario para LaunchDarkly
     user = {"key": x_user_id}
 
-    # Evaluamos el flag para este usuario
-    nuevo_precio_activo = ld_client.bool_variation(
-        FEATURE_NEW_PRICING, user, False
-    )
+    # Valor por defecto: no aplicar la nueva estrategia
+    nuevo_precio_activo = False
+
+    try:
+        # Intentamos evaluar el flag en LaunchDarkly
+        nuevo_precio_activo = ld_client.bool_variation(
+            FEATURE_NEW_PRICING,
+            user,
+            False  # fallback si LaunchDarkly no responde
+        )
+    except Exception:
+        # Si algo sale mal con LaunchDarkly, no rompemos la API:
+        # simplemente usamos el precio normal
+        nuevo_precio_activo = False
 
     if nuevo_precio_activo:
-        # Nueva lógica de precios (10% descuento) → canary via feature flag
+        # Nueva lógica (10% de descuento)
         return round(item.precio * 0.9, 2)
     else:
         # Lógica actual
