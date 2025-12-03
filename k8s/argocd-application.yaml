@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/TU_USUARIO/proyecto-devops.git'
+    repoURL: 'https://github.com/JosueLozada08/proyecto-devops.git'
     targetRevision: main
     path: k8s
   destination:
@@ -14,7 +14,7 @@ spec:
     namespace: default
   syncPolicy:
     automated:
-      prune: true      # limpia recursos que ya no están en el repo
-      selfHeal: true   # repara desalineaciones automáticamente
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true

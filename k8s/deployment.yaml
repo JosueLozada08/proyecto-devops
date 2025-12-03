@@ -1,3 +1,12 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: launchdarkly-secret
+type: Opaque
+data:
+  sdk-key: TU_SDK_KEY_EN_BASE64   # <-- aquí va tu SDK Key de LaunchDarkly en base64
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,7 +25,7 @@ spec:
     spec:
       containers:
         - name: api-devops
-          image: TU_USUARIO_DOCKER/api-devops:latest
+          image: josuelozada/api-devops:latest   # <-- tu usuario Docker Hub
           ports:
             - containerPort: 8000
           env:
@@ -27,9 +36,13 @@ spec:
                   key: sdk-key
 ---
 apiVersion: v1
-kind: Secret
+kind: Service
 metadata:
-  name: launchdarkly-secret
-type: Opaque
-data:
-  sdk-key: TU_SDK_KEY_EN_BASE64
+  name: api-devops-svc
+spec:
+  selector:
+    app: api-devops
+  ports:
+    - port: 80
+      targetPort: 8000
+  type: ClusterIP

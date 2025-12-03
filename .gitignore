@@ -1,0 +1,19 @@
+# Entornos virtuales
+venv/
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Tests / caches
+*.pytest_cache/
+.tox/
+
+# IDEs
+.vscode/
+.idea/
+*.iml
