@@ -16,7 +16,8 @@ spec:
     spec:
       containers:
         - name: api-devops
-          image: josuelozada/api-devops:latest
+          image: josuelozada/api-devops:latest   # imagen que publica tu pipeline
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           env:
@@ -32,4 +33,6 @@ metadata:
   name: launchdarkly-secret
 type: Opaque
 data:
-  sdk-key: TU_SDK_KEY_EN_BASE64   # ← aquí pones tu base64 real
+  # SDK key real de LaunchDarkly (entorno Test), codificada en Base64
+  # sdk-cacf51c7-c046-498e-a9fa-0d2209ed43fc
+  sdk-key: c2RrLWNhY2Y1MWM3LWMwNDYtNDk4ZS1hOWZhLTBkMjIwOWVkNDNmYw==
