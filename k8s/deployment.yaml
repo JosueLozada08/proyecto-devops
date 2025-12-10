@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: api-devops
-          image: josuelozada08/api-devops:latest
+          image: josuelozada/api-devops:latest
           ports:
             - containerPort: 8000
           env:
@@ -25,4 +25,3 @@ spec:
                 secretKeyRef:
                   name: launchdarkly-secret
                   key: sdk-key
-

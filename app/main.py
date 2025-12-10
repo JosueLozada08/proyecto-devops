@@ -5,9 +5,10 @@ from .models import Item, ItemBase
 from .database import db, get_next_id
 
 import os
-from ldclient import LDClient
+import ldclient
 from ldclient.config import Config
 
+# ---------------- LaunchDarkly ----------------
 FEATURE_NEW_PRICING = "new-pricing-strategy"
 
 LD_SDK_KEY = os.getenv("LAUNCHDARKLY_SDK_KEY")
@@ -19,8 +20,14 @@ if not LD_SDK_KEY:
     )
     LD_SDK_KEY = "sdk-00000000-0000-0000-0000-000000000000"
 
-ld_client = LDClient(Config(LD_SDK_KEY))
+# ✅ FORMA CORRECTA DE INICIALIZAR EL SDK
+ldclient.set_config(Config(LD_SDK_KEY))
+ld_client = ldclient.get()
 
+if ld_client.is_initialized():
+    print("[LaunchDarkly] Cliente inicializado correctamente ✅")
+else:
+    print("[LaunchDarkly] Cliente NO inicializado ❌")
 
 # ---------------- FastAPI ----------------
 app = FastAPI(
@@ -31,7 +38,6 @@ app = FastAPI(
     ),
     version="1.0.0",
 )
-
 
 @app.on_event("shutdown")
 def shutdown_event():
@@ -44,17 +50,11 @@ def shutdown_event():
 # ---------------- Endpoints CRUD ----------------
 @app.get("/items", response_model=List[Item])
 def listar_items():
-    """
-    Lista todos los ítems en la 'base de datos' en memoria.
-    """
     return list(db.values())
 
 
 @app.post("/items", response_model=Item, status_code=201)
 def crear_item(item: ItemBase):
-    """
-    Crea un nuevo ítem con ID autogenerado.
-    """
     item_id = get_next_id()
     nuevo = Item(id=item_id, **item.dict())
     db[item_id] = nuevo
@@ -63,9 +63,6 @@ def crear_item(item: ItemBase):
 
 @app.get("/items/{item_id}", response_model=Item)
 def obtener_item(item_id: int):
-    """
-    Obtiene un ítem por su ID.
-    """
     if item_id not in db:
         raise HTTPException(status_code=404, detail="Item no encontrado")
     return db[item_id]
@@ -73,9 +70,6 @@ def obtener_item(item_id: int):
 
 @app.delete("/items/{item_id}", status_code=204)
 def eliminar_item(item_id: int):
-    """
-    Elimina un ítem por su ID.
-    """
     if item_id not in db:
         raise HTTPException(status_code=404, detail="Item no encontrado")
     del db[item_id]
@@ -92,37 +86,23 @@ def obtener_precio_item(
         description="Identificador del usuario para evaluar el feature flag",
     ),
 ):
-    """
-    Devuelve el precio del item aplicando o no la nueva estrategia de precios
-    según el feature flag 'new-pricing-strategy' en LaunchDarkly.
-
-    - Si el flag está OFF o hay cualquier problema con LaunchDarkly → precio normal.
-    - Si el flag está ON para el usuario → aplica 10 % de descuento.
-    """
     if item_id not in db:
         raise HTTPException(status_code=404, detail="Item no encontrado")
 
     item = db[item_id]
     user = {"key": x_user_id}
 
-    # Valor por defecto: no aplicar la nueva estrategia
-    nuevo_precio_activo = False
-
     try:
-        # Intentamos evaluar el flag en LaunchDarkly
         nuevo_precio_activo = ld_client.bool_variation(
             FEATURE_NEW_PRICING,
             user,
-            False,  # fallback si LaunchDarkly no responde
+            False,
         )
     except Exception as e:
-        # No rompemos la API por culpa de LaunchDarkly
         print(f"[LaunchDarkly] Error evaluando flag: {e}")
         nuevo_precio_activo = False
 
     if nuevo_precio_activo:
-        # Nueva lógica de precios (10% descuento)
         return round(item.precio * 0.9, 2)
     else:
-        # Lógica actual
         return item.precio
