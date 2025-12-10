@@ -25,13 +25,4 @@ spec:
                 secretKeyRef:
                   name: launchdarkly-secret
                   key: sdk-key
----
-# IMPORTANTE: en el cluster real, este Secret se crea con la SDK Key real,
-# no se debe commitear la key productiva en texto plano al repositorio.
-apiVersion: v1
-kind: Secret
-metadata:
-  name: launchdarkly-secret
-type: Opaque
-data:
-  sdk-key: TU_SDK_KEY_EN_BASE64
+
