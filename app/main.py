@@ -8,22 +8,19 @@ import os
 from ldclient import LDClient
 from ldclient.config import Config
 
-# ---------------- LaunchDarkly ----------------
-FEATURE_NEW_PRICING = "new-pricing-strategy"  # nombre del feature flag
+FEATURE_NEW_PRICING = "new-pricing-strategy"
 
-# Leemos la SDK key desde la variable de entorno
 LD_SDK_KEY = os.getenv("LAUNCHDARKLY_SDK_KEY")
 
 if not LD_SDK_KEY:
-    # Esto no rompe la app, pero avisa en logs
     print(
         "[LaunchDarkly] WARNING: LAUNCHDARKLY_SDK_KEY no está definida. "
         "Los feature flags siempre devolverán el valor por defecto."
     )
-    # Valor dummy para que el cliente inicialice, pero las evaluaciones usarán el default
     LD_SDK_KEY = "sdk-00000000-0000-0000-0000-000000000000"
 
 ld_client = LDClient(Config(LD_SDK_KEY))
+
 
 # ---------------- FastAPI ----------------
 app = FastAPI(
