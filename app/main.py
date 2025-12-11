@@ -1,5 +1,4 @@
 from typing import List, Optional
-
 import os
 
 from fastapi import FastAPI, HTTPException, Header
@@ -10,16 +9,15 @@ from .database import db, get_next_id
 import ldclient
 from ldclient.config import Config
 
+
 # ---------------- LaunchDarkly ----------------
 
-# Clave del feature flag en LaunchDarkly
 FEATURE_NEW_PRICING = "new-pricing-strategy"
 
 # Leemos la SDK key desde la variable de entorno
 LD_SDK_KEY = os.getenv("LAUNCHDARKLY_SDK_KEY")
 
 if not LD_SDK_KEY:
-    # Para el proyecto es mejor fallar fuerte si falta la SDK key
     raise RuntimeError(
         "[LaunchDarkly] ERROR: LAUNCHDARKLY_SDK_KEY no está definida en las "
         "variables de entorno. Verifica el Secret de Kubernetes "
@@ -50,9 +48,7 @@ app = FastAPI(
 
 @app.on_event("shutdown")
 def shutdown_event():
-    """
-    Cerramos el cliente de LaunchDarkly cuando se apaga la app.
-    """
+    """Cerramos el cliente de LaunchDarkly cuando se apaga la app."""
     ld_client.close()
 
 
@@ -60,17 +56,13 @@ def shutdown_event():
 
 @app.get("/items", response_model=List[Item])
 def listar_items():
-    """
-    Lista todos los items almacenados en la 'base de datos' en memoria.
-    """
+    """Lista todos los items almacenados en la 'base de datos' en memoria."""
     return list(db.values())
 
 
 @app.post("/items", response_model=Item, status_code=201)
 def crear_item(item: ItemBase):
-    """
-    Crea un nuevo item con un ID autogenerado.
-    """
+    """Crea un nuevo item con un ID autogenerado."""
     item_id = get_next_id()
     nuevo = Item(id=item_id, **item.dict())
     db[item_id] = nuevo
@@ -79,9 +71,7 @@ def crear_item(item: ItemBase):
 
 @app.get("/items/{item_id}", response_model=Item)
 def obtener_item(item_id: int):
-    """
-    Obtiene un item por ID.
-    """
+    """Obtiene un item por ID."""
     if item_id not in db:
         raise HTTPException(status_code=404, detail="Item no encontrado")
     return db[item_id]
@@ -89,9 +79,7 @@ def obtener_item(item_id: int):
 
 @app.delete("/items/{item_id}", status_code=204)
 def eliminar_item(item_id: int):
-    """
-    Elimina un item por ID.
-    """
+    """Elimina un item por ID."""
     if item_id not in db:
         raise HTTPException(status_code=404, detail="Item no encontrado")
     del db[item_id]
@@ -111,6 +99,7 @@ def obtener_precio_item(
 ):
     """
     Devuelve el precio del item.
+
     Si el feature flag 'new-pricing-strategy' está activo para el usuario,
     aplica un 10% de descuento como ejemplo de nueva estrategia de precios.
     """
@@ -123,10 +112,13 @@ def obtener_precio_item(
     user = {"key": x_user_id}
 
     try:
-        nuevo_precio_activo = ld_client.bool_variation(
-            FEATURE_NEW_PRICING,
-            user,
-            False,  # valor por defecto si algo falla
+        # En el SDK Python la API es 'variation', no 'bool_variation'
+        nuevo_precio_activo = bool(
+            ld_client.variation(
+                FEATURE_NEW_PRICING,
+                user,
+                False,  # valor por defecto si algo falla
+            )
         )
     except Exception as e:
         print(f"[LaunchDarkly] Error evaluando flag: {e}")
@@ -161,7 +153,7 @@ def debug_launchdarkly(
     }
 
     try:
-        status["flag_value"] = ld_client.bool_variation(
+        status["flag_value"] = ld_client.variation(
             FEATURE_NEW_PRICING,
             user,
             False,
