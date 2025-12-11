@@ -8,6 +8,8 @@ from .database import db, get_next_id
 
 import ldclient
 from ldclient.config import Config
+from ldclient import Context  # 👈 USAMOS CONTEXT, NO DICT
+
 
 # ---------------- LaunchDarkly ----------------
 
@@ -107,17 +109,17 @@ def obtener_precio_item(
 
     item = db[item_id]
 
-    # Representación simple de usuario para LaunchDarkly
-    user = {"key": x_user_id or "anonimo"}
+    # 👇 CONTEXTO UNIFICADO (SDK 8+)
+    # Creamos un contexto de tipo "user" con la key del header
+    context = Context.create(x_user_id or "anonimo")
 
     try:
-        # 👇 AQUÍ ESTÁ LO IMPORTANTE
-        # En el SDK Python la API correcta es 'variation', NO 'bool_variation'
+        # En el SDK Python la API correcta es 'variation'
         nuevo_precio_activo = bool(
             ld_client.variation(
                 FEATURE_NEW_PRICING,
-                user,
-                False,  # valor por defecto si algo falla
+                context,   # 👈 YA NO ES dict, ES Context
+                False,     # valor por defecto si algo falla
             )
         )
     except Exception as e:
@@ -144,7 +146,7 @@ def debug_launchdarkly(
     - El cliente de LaunchDarkly está inicializado
     - El valor actual del flag 'new-pricing-strategy' para un usuario dado
     """
-    user = {"key": x_user_id or "debug-user"}
+    context = Context.create(x_user_id or "debug-user")
 
     status = {
         "sdk_key_configurada": bool(LD_SDK_KEY),
@@ -155,7 +157,7 @@ def debug_launchdarkly(
     try:
         status["flag_value"] = ld_client.variation(
             FEATURE_NEW_PRICING,
-            user,
+            context,
             False,
         )
     except Exception as e:
