@@ -9,7 +9,6 @@ from .database import db, get_next_id
 import ldclient
 from ldclient.config import Config
 
-
 # ---------------- LaunchDarkly ----------------
 
 FEATURE_NEW_PRICING = "new-pricing-strategy"
@@ -109,10 +108,11 @@ def obtener_precio_item(
     item = db[item_id]
 
     # Representación simple de usuario para LaunchDarkly
-    user = {"key": x_user_id}
+    user = {"key": x_user_id or "anonimo"}
 
     try:
-        # En el SDK Python la API es 'variation', no 'bool_variation'
+        # 👇 AQUÍ ESTÁ LO IMPORTANTE
+        # En el SDK Python la API correcta es 'variation', NO 'bool_variation'
         nuevo_precio_activo = bool(
             ld_client.variation(
                 FEATURE_NEW_PRICING,
@@ -144,7 +144,7 @@ def debug_launchdarkly(
     - El cliente de LaunchDarkly está inicializado
     - El valor actual del flag 'new-pricing-strategy' para un usuario dado
     """
-    user = {"key": x_user_id}
+    user = {"key": x_user_id or "debug-user"}
 
     status = {
         "sdk_key_configurada": bool(LD_SDK_KEY),
